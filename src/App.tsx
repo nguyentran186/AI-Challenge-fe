@@ -1,12 +1,15 @@
-import { Autocomplete, Button, Checkbox, TextField } from "@mui/material";
-import Container from "@mui/material/Container";
+import React, { useState, useEffect } from 'react';
+import { Autocomplete, Button, Checkbox, TextField, Container, Card } from "@mui/material";
 import ResultItem from "./resultItem";
-import Card from "@mui/material/Card";
-import top100Films from "./top100Films";
-import React from "react";
+import top100Films from "./top100Films"; // Assuming this is imported, but not used in the final code
+
+interface Tag {
+  label: string;
+}
+
 const label = { inputProps: { "aria-label": "Checkbox demo" } };
 
-const N = 3;
+const N = 100;
 
 function getFirstNElements(arr: string[], n: number = N) {
   return arr.slice(0, n);
@@ -15,10 +18,7 @@ function getFirstNElements(arr: string[], n: number = N) {
 export default function App() {
   const [form1, setForm1] = React.useState({
     tag_search: false,
-    tag_query: {
-      label: "123",
-      year: 2000,
-    },
+    tag_query: '',
     tag_k: "2000",
   });
 
@@ -30,35 +30,54 @@ export default function App() {
   });
 
   const [result, setResult] = React.useState<string[]>([
-    "Laa_Vbbb_cc1",
-    "Laa_Vbbb_cc2",
-    "Laa_Vbbb_cc3",
-    "Laa_Vbbb_cc4",
-    "Laa_Vbbb_cc5",
-    "Laa_Vbbb_cc6",
   ]);
+  
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [inputValue, setInputValue] = useState<string>(''); // To track current input value
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+
+  useEffect(() => {
+    // Fetch the tag list JSON file
+    fetch('/taglist.json')
+      .then(response => response.json())
+      .then((data: string[]) => {
+        // Convert array of strings to array of Tag objects
+        const tagsArray = data.map(tag => ({ label: tag }));
+        setTags(tagsArray);
+      });
+  }, []);
+
+  const handleInputChange = (event: React.ChangeEvent<{}>, newInputValue: string) => {
+    setInputValue(newInputValue);
+  };
+
+  const handleChange = (event: React.ChangeEvent<{}>, newValue: Tag | null) => {
+    if (newValue) {
+      setSelectedTags(prevTags => [...prevTags, newValue.label]);
+      setForm1(prevForm1 => ({
+        ...prevForm1,
+        tag_query: prevForm1.tag_query ? `${prevForm1.tag_query} ${newValue.label}` : newValue.label
+      }));
+      setInputValue(''); // Reset the input value
+    } else {
+      setInputValue('');
+    }
+  };
+
+  const handleClearSelectedTags = () => {
+    setSelectedTags([]); // Clear the all selected tags list
+    setForm1(prevForm1 => ({ ...prevForm1, tag_query: '' })); // Clear tag_query in form1
+  };
 
   const [selectResult, setSelectResult] = React.useState<string[]>([]);
-  const [checkedItems, setCheckedItems] = React.useState<
-    Record<string, boolean>
-  >({});
+  const [checkedItems, setCheckedItems] = React.useState<Record<string, boolean>>({});
 
   const onChangeForm1 = (key: string, value: any) => {
-    setForm1((prev) => {
-      const cpy = { ...prev };
-      // @ts-ignore
-      cpy[key] = value;
-      return cpy;
-    });
+    setForm1(prev => ({ ...prev, [key]: value }));
   };
 
   const onChangeForm2 = (key: string, value: any) => {
-    setForm2((prev) => {
-      const cpy = { ...prev };
-      // @ts-ignore
-      cpy[key] = value;
-      return cpy;
-    });
+    setForm2(prev => ({ ...prev, [key]: value }));
   };
 
   const handleClick = async () => {
@@ -68,43 +87,33 @@ export default function App() {
     };
     console.log(bodySend);
 
-    //   try {
-    //     const response = await fetch("https://api.example.com/data", {
-    //       method: "POST",
-    //       headers: {
-    //         "Content-Type": "application/json",
-    //       },
-    //       body: JSON.stringify(bodySend),
-    //     });
+    try {
+      const response = await fetch("http://localhost:8080/search", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(bodySend),
+      });
 
-    //     if (!response.ok) {
-    //       throw new Error(`HTTP error! status: ${response.status}`);
-    //     }
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-    //     const data = await response.json();
+      const data = await response.json();
+      setResult(data);
 
-    //     // <-- thêm setResult dưới comment này -->
-
-    //   } catch (error) {
-    //     console.error("Error:", error);
-    // }
-
-    setResult(["123", "12345678"]);
+    } catch (error) {
+      console.error("Error:", error);
+    }
   };
 
   const handleRemove = () => {
-    setResult((prev) => {
-      const cpy = [...prev];
-      return cpy.filter((item) => !selectResult.includes(item));
-    });
+    setResult(prev => prev.filter(item => !selectResult.includes(item)));
   };
 
   const handleMoveTop = () => {
-    setResult((prev) => {
-      const cpy = [...prev];
-      const cleanCpy = cpy.filter((item) => !selectResult.includes(item));
-      return [...selectResult, ...cleanCpy];
-    });
+    setResult(prev => [...selectResult, ...prev.filter(item => !selectResult.includes(item))]);
     setSelectResult([]);
     setCheckedItems({});
   };
@@ -148,22 +157,20 @@ export default function App() {
                 padding: 0,
                 borderRadius: 6,
               }}
-              value={form1.tag_search}
-              onClick={() => {
-                onChangeForm1("tag_search", !form1.tag_search);
-              }}
+              checked={form1.tag_search}
+              onChange={() => onChangeForm1("tag_search", !form1.tag_search)}
             />
           </div>
 
           <Autocomplete
             disablePortal
-            options={top100Films}
-            renderInput={(params) => <TextField {...params} label="Tag" />}
+            options={tags.filter(tag => tag.label.toLowerCase().includes(inputValue.toLowerCase()))} // Filter options based on current input
+            renderInput={(params) => <TextField {...params} label="Tag" variant="outlined" size="small" />}
             size="small"
-            value={form1.tag_query}
-            onChange={(event, newValue) => {
-              onChangeForm1("tag_query", newValue);
-            }}
+            inputValue={inputValue} // Use inputValue state
+            onInputChange={handleInputChange} // Update inputValue on change
+            onChange={handleChange} // Update tempTags and selectedTags on change
+            value={null} // Ensures input is cleared after selection
           />
 
           <div
@@ -177,14 +184,20 @@ export default function App() {
               label="Tag filter number"
               variant="outlined"
               size="small"
-              sx={{
-                maxWidth: "180px",
-              }}
+              sx={{ maxWidth: "180px" }}
               value={form1.tag_k}
-              onChange={(e) => {
-                onChangeForm1("tag_k", e.target.value);
-              }}
+              onChange={(e) => onChangeForm1("tag_k", e.target.value)}
             />
+          </div>
+
+          <div>
+            <h4>All Selected Tags:</h4>
+            <ul>
+              {selectedTags.map((tag, index) => (
+                <li key={index}>{tag}</li>
+              ))}
+            </ul>
+            <Button onClick={handleClearSelectedTags} variant="contained">Clear All Selected Tags</Button>
           </div>
         </Card>
 
@@ -204,23 +217,12 @@ export default function App() {
               alignItems: "center",
             }}
           >
-            <p
-              style={{
-                margin: 0,
-              }}
-            >
-              Search text
-            </p>
+            <p style={{ margin: 0 }}>Search text</p>
             <Checkbox
               {...label}
-              style={{
-                padding: 0,
-                borderRadius: 6,
-              }}
-              value={form2.prompt_search}
-              onClick={() => {
-                onChangeForm2("prompt_search", !form2.prompt_search);
-              }}
+              style={{ padding: 0, borderRadius: 6 }}
+              checked={form2.prompt_search}
+              onChange={() => onChangeForm2("prompt_search", !form2.prompt_search)}
             />
           </div>
 
@@ -229,9 +231,7 @@ export default function App() {
             variant="outlined"
             size="small"
             value={form2.prompt_query}
-            onChange={(e) => {
-              onChangeForm2("prompt_query", e.target.value);
-            }}
+            onChange={(e) => onChangeForm2("prompt_query", e.target.value)}
           />
 
           <div
@@ -245,50 +245,30 @@ export default function App() {
               label="Text filter number"
               variant="outlined"
               size="small"
-              sx={{
-                maxWidth: "180px",
-              }}
+              sx={{ maxWidth: "180px" }}
               value={form2.prompt_k}
-              onChange={(e) => {
-                onChangeForm2("prompt_k", e.target.value);
-              }}
+              onChange={(e) => onChangeForm2("prompt_k", e.target.value)}
             />
 
-            <p
-              style={{
-                margin: 0,
-                marginLeft: 10,
-              }}
-            >
-              Translate
-            </p>
+            <p style={{ margin: 0, marginLeft: 10 }}>Translate</p>
             <Checkbox
               {...label}
-              style={{
-                padding: 0,
-                borderRadius: 6,
-              }}
-              value={form2.translate}
-              onClick={() => {
-                onChangeForm2("translate", !form2.translate);
-              }}
+              style={{ padding: 0, borderRadius: 6 }}
+              checked={form2.translate}
+              onChange={() => onChangeForm2("translate", !form2.translate)}
             />
           </div>
         </Card>
 
         <Button
           variant="contained"
-          sx={{
-            height: 40,
-            width: "100%",
-          }}
-          onClick={() => {
-            handleClick();
-          }}
+          sx={{ height: 40, width: "100%" }}
+          onClick={handleClick}
         >
           Search
         </Button>
       </div>
+
       <div style={{ flex: 1 }}>
         <div
           style={{
@@ -301,19 +281,15 @@ export default function App() {
           <Button
             color="error"
             variant="contained"
-            sx={{
-              height: 40,
-            }}
-            onClick={() => handleRemove()}
+            sx={{ height: 40 }}
+            onClick={handleRemove}
           >
             Remove
           </Button>
           <Button
             variant="contained"
-            sx={{
-              height: 40,
-            }}
-            onClick={() => handleMoveTop()}
+            sx={{ height: 40 }}
+            onClick={handleMoveTop}
           >
             Move to top
           </Button>
