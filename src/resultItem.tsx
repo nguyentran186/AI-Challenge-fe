@@ -15,7 +15,7 @@ export default function ResultItem({
   >;
 }) {
   const nameList = name.split("_");
-  const path = `/data/keyframes/Keyframes_${nameList[0]}/${nameList[0]}_${nameList[1]}/${nameList[2]}.jpg`;
+  const path = `/data/keyframes_trans/${nameList[0]}/${nameList[1]}/${nameList[2]}.jpg`;
   React.useEffect(() => {
     if (checked) {
       setRemoveResult((prev) => {

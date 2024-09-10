@@ -29,6 +29,12 @@ export default function App() {
     translate: false,
   });
 
+  const [form3, setForm3] = React.useState({
+    ocr_search: false,
+    ocr_query: "",
+    ocr_k: "100", // Or any default value
+  });
+
   const [result, setResult] = React.useState<string[]>([
   ]);
   
@@ -80,10 +86,15 @@ export default function App() {
     setForm2(prev => ({ ...prev, [key]: value }));
   };
 
+  const onChangeForm3 = (key: string, value: any) => {
+    setForm3(prev => ({ ...prev, [key]: value }));
+  };
+
   const handleClick = async () => {
     const bodySend = {
       ...form1,
       ...form2,
+      ...form3,
     };
     console.log(bodySend);
 
@@ -259,6 +270,58 @@ export default function App() {
             />
           </div>
         </Card>
+
+        <Card
+          variant="outlined"
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            padding: 1,
+            gap: 1.5,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+            }}
+          >
+            <p style={{ margin: 0 }}>Search OCR</p>
+            <Checkbox
+              {...label}
+              style={{ padding: 0, borderRadius: 6 }}
+              checked={form3.ocr_search}
+              onChange={() => onChangeForm3("ocr_search", !form3.ocr_search)}
+            />
+          </div>
+
+          <TextField
+            label="OCR Text"
+            variant="outlined"
+            size="small"
+            value={form3.ocr_query}
+            onChange={(e) => onChangeForm3("ocr_query", e.target.value)}
+          />
+
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+            }}
+          >
+            <TextField
+              label="OCR filter number"
+              variant="outlined"
+              size="small"
+              sx={{ maxWidth: "180px" }}
+              value={form3.ocr_k}
+              onChange={(e) => onChangeForm3("ocr_k", e.target.value)}
+            />
+          </div>
+        </Card>
+
 
         <Button
           variant="contained"
