@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Autocomplete, Button, Checkbox, TextField, Container, Card } from "@mui/material";
+import { Autocomplete, Button, Checkbox, TextField, Container, Card, Box } from "@mui/material";
 import ResultItem from "./resultItem";
 import top100Films from "./top100Films"; // Assuming this is imported, but not used in the final code
 
@@ -25,7 +25,7 @@ export default function App() {
   const [form2, setForm2] = React.useState({
     prompt_search: false,
     prompt_query: "",
-    prompt_k: "200",
+    prompt_k: "100",
     translate: false,
   });
 
@@ -41,6 +41,9 @@ export default function App() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [inputValue, setInputValue] = useState<string>(''); // To track current input value
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [textData, setTextData] = useState<string>('');
+  const [replaceText, setReplaceText] = useState<string>(''); //
+  const [questionData, setQuestionData] = useState<string>(''); //
 
   useEffect(() => {
     // Fetch the tag list JSON file
@@ -119,14 +122,45 @@ export default function App() {
     }
   };
 
-  const handleRemove = () => {
-    setResult(prev => prev.filter(item => !selectResult.includes(item)));
+  const handleSetTop = () => {
+    if (replaceText) {
+      setResult(prev => [replaceText, ...prev.slice(1)]); // Replace first element
+      setReplaceText(''); // Clear the input field
+    }
   };
 
   const handleMoveTop = () => {
     setResult(prev => [...selectResult, ...prev.filter(item => !selectResult.includes(item))]);
     setSelectResult([]);
     setCheckedItems({});
+  };
+
+  const handleExport = async () => {
+    const exportData = {
+      images: getFirstNElements(result), // List of images
+      textData, // Text input data from the export box
+      questionData,
+    };
+
+    try {
+      const response = await fetch("http://localhost:8080/export", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(exportData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("Export successful:", data);
+
+    } catch (error) {
+      console.error("Error:", error);
+    }
   };
 
   return (
@@ -270,7 +304,7 @@ export default function App() {
             />
           </div>
         </Card>
-
+{/* 
         <Card
           variant="outlined"
           sx={{
@@ -320,7 +354,7 @@ export default function App() {
               onChange={(e) => onChangeForm3("ocr_k", e.target.value)}
             />
           </div>
-        </Card>
+        </Card> */}
 
 
         <Button
@@ -330,7 +364,37 @@ export default function App() {
         >
           Search
         </Button>
+
+        <Box sx={{ display: 'flex', gap: 2 }}>
+        <TextField
+          label="Q&A Answer"
+          variant="outlined"
+          size="small"
+          value={textData}
+          onChange={(e) => setTextData(e.target.value)}
+          sx={{ flex: 8 }}
+        />
+        <TextField
+          label="No"
+          variant="outlined"
+          size="small"
+          value={questionData}
+          onChange={(e) => setQuestionData(e.target.value)}
+          sx={{ flex: 2 }}
+        />
+        </Box>
+
+        <Button
+          variant="contained"
+          color="secondary"
+          sx={{ height: 40, width: "100%" }}
+          onClick={handleExport}
+        >
+          Export
+        </Button>
       </div>
+
+      
 
       <div style={{ flex: 1 }}>
         <div
@@ -341,14 +405,19 @@ export default function App() {
             marginBottom: 16,
           }}
         >
-          <Button
-            color="error"
-            variant="contained"
-            sx={{ height: 40 }}
-            onClick={handleRemove}
-          >
-            Remove
-          </Button>
+          <div style={{ display: "flex", gap: 10 }}>
+            <TextField
+              label="Frame name"
+              variant="outlined"
+              size="small"
+              value={replaceText}
+              onChange={(e) => setReplaceText(e.target.value)} // Handle text input
+            />
+            <Button variant="contained" onClick={handleSetTop}>
+              Set Top
+            </Button>
+          </div>
+
           <Button
             variant="contained"
             sx={{ height: 40 }}
