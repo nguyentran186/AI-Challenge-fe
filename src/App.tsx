@@ -124,10 +124,25 @@ export default function App() {
 
   const handleSetTop = () => {
     if (replaceText) {
-      setResult(prev => [replaceText, ...prev.slice(1)]); // Replace first element
+      const frameParts = replaceText.split('_'); // Split the frame into parts: [L01, V001, 003]
+      const baseFrame = parseInt(frameParts[2], 10); // Extract the frame number (e.g., 003 as 3)
+  
+      // Create two previous and two next frames
+      const newFrames = [
+        replaceText, // Original frame at position 0
+        `${frameParts[0]}_${frameParts[1]}_${String(baseFrame - 2).padStart(3, '0')}`,
+        `${frameParts[0]}_${frameParts[1]}_${String(baseFrame - 1).padStart(3, '0')}`,
+        `${frameParts[0]}_${frameParts[1]}_${String(baseFrame + 1).padStart(3, '0')}`,
+        `${frameParts[0]}_${frameParts[1]}_${String(baseFrame + 2).padStart(3, '0')}`,
+      ];
+  
+      // Update the result by replacing the first 5 elements and then appending the rest of prev
+      setResult(prev => [...newFrames, ...prev.slice(5)]);
+  
       setReplaceText(''); // Clear the input field
     }
   };
+  
 
   const handleMoveTop = () => {
     setResult(prev => [...selectResult, ...prev.filter(item => !selectResult.includes(item))]);
