@@ -44,6 +44,36 @@ export default function App() {
   const [textData, setTextData] = useState<string>('');
   const [replaceText, setReplaceText] = useState<string>(''); //
   const [questionData, setQuestionData] = useState<string>(''); //
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+        setSelectedFile(event.target.files[0]);
+    }
+    };
+
+  const handleSearchByImage = async () => {
+    if (!selectedFile) {
+        alert("Please select an image first!");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('image', selectedFile);
+
+    try {
+        const response = await fetch('http://localhost:8080/search_by_image', {
+            method: 'POST',
+            body: formData,
+        });
+
+        const data = await response.json();
+        setResult(data);
+
+    } catch (error) {
+        console.error("Error uploading image:", error);
+    }
+  };
 
   useEffect(() => {
     // Fetch the tag list JSON file
@@ -121,6 +151,8 @@ export default function App() {
       console.error("Error:", error);
     }
   };
+
+  
 
   const handleSetTop = () => {
     if (replaceText) {
@@ -379,6 +411,20 @@ export default function App() {
         >
           Search
         </Button>
+
+        <Card
+          variant="outlined"
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            padding: 1,
+            gap: 1.5,
+          }}
+        >
+          <h4>Search by Image</h4>
+          <input type="file" accept="image/*" onChange={handleFileChange} />
+          <Button onClick={handleSearchByImage} variant="contained">Search by Image</Button>
+        </Card>
 
         <Box sx={{ display: 'flex', gap: 2 }}>
         <TextField
