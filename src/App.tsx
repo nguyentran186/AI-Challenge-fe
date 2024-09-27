@@ -45,7 +45,43 @@ export default function App() {
   const [replaceText, setReplaceText] = useState<string>(''); //
   const [questionData, setQuestionData] = useState<string>(''); //
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [textQueries, setTextQueries] = useState<string[]>([""]);
 
+  const handleAddQuery = () => {
+    setTextQueries(prevQueries => [...prevQueries, ""]); // Add a new empty query
+  };
+  const handleQueryChange = (index: number, value: string) => {
+    const updatedQueries = [...textQueries];
+    updatedQueries[index] = value; // Update the specific query
+    setTextQueries(updatedQueries);
+  };
+  const handleRemoveQuery = (index: number) => {
+    const updatedQueries = textQueries.filter((_, i) => i !== index); // Remove the query at the specified index
+    setTextQueries(updatedQueries);
+  };
+
+  const handleSearchBySequence = async () => {
+    try {
+      const response = await fetch("http://localhost:8080/search_by_sequence", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ queries: textQueries }), // Send only the final query
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setResult(data); // Assuming `setResult` updates the state to display images
+
+    } catch (error) {
+      console.error("Error during search by sequence:", error);
+    }
+  };
+  
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
         setSelectedFile(event.target.files[0]);
@@ -425,6 +461,26 @@ export default function App() {
           <input type="file" accept="image/*" onChange={handleFileChange} />
           <Button onClick={handleSearchByImage} variant="contained">Search by Image</Button>
         </Card>
+        <Card variant="outlined" sx={{ padding: 1, gap: 1.5, display: "flex", flexDirection: "column" }}>
+          <h4>Search by Sequence</h4>
+          {textQueries.map((query, index) => (
+            <Box key={index} sx={{ display: 'flex', gap: 1 }}>
+              <TextField
+                label={`Query ${index + 1}`}
+                variant="outlined"
+                size="small"
+                value={query}
+                onChange={(e) => handleQueryChange(index, e.target.value)}
+                fullWidth
+              />
+              <Button variant="outlined" color="error" onClick={() => handleRemoveQuery(index)}>Remove</Button>
+            </Box>
+          ))}
+          <Button variant="contained" onClick={handleAddQuery}>+</Button>
+          <Button variant="contained" onClick={handleSearchBySequence} sx={{ marginTop: 2 }}>
+            Search
+          </Button>
+        </Card>
 
         <Box sx={{ display: 'flex', gap: 2 }}>
         <TextField
@@ -512,4 +568,6 @@ export default function App() {
       </div>
     </Container>
   );
+  // Function to get handle optional list of text query
+
 }
