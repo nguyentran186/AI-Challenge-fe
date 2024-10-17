@@ -69,7 +69,7 @@ export default function App() {
 
         const data = await response.json();
         setID(data[0].id); // Assuming the 'id' field is returned
-        setIDQA(data[1].id); // Assuming the 'id' field is returned
+        setIDQA(data[0].id); // Assuming the 'id' field is returned
         console.log('Data fetched:', data);
 
       } catch (error) {
