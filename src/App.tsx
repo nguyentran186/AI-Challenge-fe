@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Autocomplete, Button, Checkbox, TextField, Container, Card, Box } from "@mui/material";
+import React, { useState, useRef, useEffect } from 'react';
+import { Autocomplete, Button, Checkbox, TextField, Container, Card, Box} from "@mui/material";
 import ResultItem from "./resultItem";
 import top100Films from "./top100Films"; // Assuming this is imported, but not used in the final code
 
@@ -23,7 +23,7 @@ export default function App() {
   });
 
   const [form2, setForm2] = React.useState({
-    prompt_search: false,
+    prompt_search: true,
     prompt_query: "",
     prompt_k: "100",
     translate: false,
@@ -35,9 +35,16 @@ export default function App() {
     ocr_k: "100", // Or any default value
   });
 
+  const [isCanvasOpen, setIsCanvasOpen] = useState(false);
+  const smallCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const largeCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [lastPos, setLastPos] = useState<{ x: number, y: number } | null>(null); // Store the last known position
+  const [sketchTASK, setSketchTASK] = useState<string | null>(null);
+  const [textTASK, setTextTASK] = useState<string>("");
+  
   const [result, setResult] = React.useState<string[]>([
   ]);
-  
   const [tags, setTags] = useState<Tag[]>([]);
   const [inputValue, setInputValue] = useState<string>(''); // To track current input value
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -46,6 +53,163 @@ export default function App() {
   const [questionData, setQuestionData] = useState<string>(''); //
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [textQueries, setTextQueries] = useState<string[]>([""]);
+
+  const setCanvasBackground = (canvas: HTMLCanvasElement, color: string) => {
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      // ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+  };
+
+  useEffect(() => {
+    const smallCanvas = smallCanvasRef.current;
+    if (smallCanvas) {
+      setCanvasBackground(smallCanvas, 'white'); // Set white background for small canvas
+    }
+  }, []);
+
+  const openCanvas = () => {
+    setIsCanvasOpen(true);
+    const largeCanvas = largeCanvasRef.current;
+    if (largeCanvas) {
+      setCanvasBackground(largeCanvas, 'white'); // Set white background for large canvas
+    }
+  };
+
+  const closeCanvas = () => {
+    setIsCanvasOpen(false);
+  };
+
+  const handleMouseLeave = () => {
+    if (isDrawing) {
+      setIsDrawing(false);
+      setLastPos(null); // Reset the last position when done drawing
+    }
+  };
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = largeCanvasRef.current;
+    if (canvas) {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      setIsDrawing(true);
+      setLastPos({ x, y });
+    }
+  };
+  const getBase64StringFromDataURL = (dataURL: string): string =>
+    dataURL.replace('data:', '').replace(/^.+,/, '');
+
+  const handleMouseUp = () => {
+    setIsDrawing(false);
+    setLastPos(null); // Reset the last position when done drawing
+
+    // Capture the sketch and display it in the small canvas
+    const largeCanvas = largeCanvasRef.current;
+    const smallCanvas = smallCanvasRef.current;
+    if (largeCanvas && smallCanvas) {
+      const largeCtx = largeCanvas.getContext('2d');
+      const smallCtx = smallCanvas.getContext('2d');
+
+      if (largeCtx && smallCtx) {
+        // Get the image data from the large canvas
+        const imageData = largeCanvas.toDataURL();
+
+        // Store the sketch in sketchTASK
+        setSketchTASK(getBase64StringFromDataURL(imageData));
+
+        // Draw it on the small canvas (resized)
+        const img = new Image();
+        img.src = imageData;
+        img.onload = () => {
+          smallCtx.clearRect(0, 0, smallCanvas.width, smallCanvas.height); // Clear before drawing
+          smallCtx.drawImage(img, 0, 0, smallCanvas.width, smallCanvas.height); // Resize the image
+        };
+      }
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return;
+
+    const canvas = largeCanvasRef.current;
+    if (canvas && lastPos) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        // Draw a line from the last known position to the current position
+        ctx.beginPath();
+        ctx.moveTo(lastPos.x, lastPos.y);
+        ctx.lineTo(x, y);
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 5;
+        ctx.stroke();
+
+        // Update the last known position
+        setLastPos({ x, y });
+      }
+    }
+  };
+
+  const toggleEraser = () => {
+    setIsErasing(!isErasing);
+  };
+  
+  const updateSmallCanvas = () => {
+    const largeCanvas = largeCanvasRef.current;
+    const smallCanvas = smallCanvasRef.current;
+
+    if (largeCanvas && smallCanvas) {
+      const smallCtx = smallCanvas.getContext('2d');
+      if (smallCtx) {
+        smallCtx.clearRect(0, 0, smallCanvas.width, smallCanvas.height); // Clear the small canvas
+        smallCtx.drawImage(largeCanvas, 0, 0, smallCanvas.width, smallCanvas.height); // Draw the resized sketch
+        const sketchData = smallCanvas.toDataURL(); // Get base64 of the sketch
+        setSketchTASK(sketchData); // Store the sketch data
+      }
+    }
+  };
+
+  const handleTextTASK = (value: string) => {
+    setTextTASK(value);
+  }
+
+  const handleSearchBySketchandText = async () => {
+    if (!sketchTASK || !textTASK) {
+      alert('Please provide both a sketch and text.');
+      return;
+    }
+
+    const searchData = {
+      sketch: sketchTASK,
+      text: textTASK,
+    };
+
+    try {
+      const response = await fetch("http://localhost:8080/search_by_sketch_text", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(searchData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setResult(data);
+
+    } catch (error) {
+      console.error("Error during search:", error);
+    }
+  };
 
   const handleAddQuery = () => {
     setTextQueries(prevQueries => [...prevQueries, ""]); // Add a new empty query
@@ -247,272 +411,164 @@ export default function App() {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ paddingTop: 2, display: "flex", gap: 9 }}>
-      <div
-        style={{
-          width: 300,
-          display: "flex",
-          flexDirection: "column",
-          gap: 20,
-        }}
-      >
-        <Card
-          variant="outlined"
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            padding: 1,
-            gap: 1.5,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              alignItems: "center",
-            }}
-          >
-            <p
-              style={{
-                margin: 0,
-              }}
-            >
-              Search tags
-            </p>
-            <Checkbox
-              {...label}
-              style={{
-                padding: 0,
-                borderRadius: 6,
-              }}
-              checked={form1.tag_search}
-              onChange={() => onChangeForm1("tag_search", !form1.tag_search)}
-            />
-          </div>
-
-          <Autocomplete
-            disablePortal
-            options={tags.filter(tag => tag.label.toLowerCase().includes(inputValue.toLowerCase()))} // Filter options based on current input
-            renderInput={(params) => <TextField {...params} label="Tag" variant="outlined" size="small" />}
-            size="small"
-            inputValue={inputValue} // Use inputValue state
-            onInputChange={handleInputChange} // Update inputValue on change
-            onChange={handleChange} // Update tempTags and selectedTags on change
-            value={null} // Ensures input is cleared after selection
-          />
-
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              alignItems: "center",
-            }}
-          >
-            <TextField
-              label="Tag filter number"
-              variant="outlined"
-              size="small"
-              sx={{ maxWidth: "180px" }}
-              value={form1.tag_k}
-              onChange={(e) => onChangeForm1("tag_k", e.target.value)}
-            />
-          </div>
-
-          <div>
-            <h4>All Selected Tags:</h4>
-            <ul>
-              {selectedTags.map((tag, index) => (
-                <li key={index}>{tag}</li>
-              ))}
-            </ul>
-            <Button onClick={handleClearSelectedTags} variant="contained">Clear All Selected Tags</Button>
-          </div>
-        </Card>
-
-        <Card
-          variant="outlined"
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            padding: 1,
-            gap: 1.5,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              alignItems: "center",
-            }}
-          >
-            <p style={{ margin: 0 }}>Search text</p>
-            <Checkbox
-              {...label}
-              style={{ padding: 0, borderRadius: 6 }}
-              checked={form2.prompt_search}
-              onChange={() => onChangeForm2("prompt_search", !form2.prompt_search)}
-            />
-          </div>
-
-          <TextField
-            label="Text"
+    <>
+    <Container maxWidth="lg" sx={{ paddingTop: 2, display: "flex", gap: 9 , margin: 0}}>
+      {/* Flex container for Search by Sequence on the left and others */}
+      <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start", padding: 0, margin: 0 }}>
+        
+        {/* Search by Sequence on the left-most */}
+        <Box sx={{ width: "250px", flexGrow: 0, flexShrink: 0 }}>
+          <Card
             variant="outlined"
-            size="small"
-            value={form2.prompt_query}
-            onChange={(e) => onChangeForm2("prompt_query", e.target.value)}
-          />
-
-          <div
-            style={{
+            sx={{
               display: "flex",
-              gap: 10,
-              alignItems: "center",
+              flexDirection: "column",
+              padding: 1,
+              gap: 1.5,
             }}
           >
+            <h4>Search by Sequence</h4>
+            {textQueries.map((query, index) => (
+              <Box key={index} sx={{ display: 'flex', gap: 1 }}>
+                <TextField
+                  label={`Query ${index + 1}`}
+                  variant="outlined"
+                  size="small"
+                  value={query}
+                  onChange={(e) => handleQueryChange(index, e.target.value)}
+                  fullWidth
+                />
+                <Button variant="outlined" color="error" onClick={() => handleRemoveQuery(index)}>Remove</Button>
+              </Box>
+            ))}
+            <Button variant="contained" onClick={handleAddQuery}>+</Button>
+            <Button variant="contained" onClick={handleSearchBySequence} sx={{ marginTop: 2 }}>
+              Search
+            </Button>
+          </Card>
+          <Card sx={{ marginTop: 2, padding: 2, cursor: "pointer", display: "flex", flexDirection: "column",}}>
+            <h4>Search by Sketch and Text</h4>
+            <canvas ref={smallCanvasRef} width={200} height={150} style={{ border: '1px solid black' }} onClick={openCanvas}/>
             <TextField
-              label="Text filter number"
+              label="Text"
               variant="outlined"
               size="small"
-              sx={{ maxWidth: "180px" }}
-              value={form2.prompt_k}
-              onChange={(e) => onChangeForm2("prompt_k", e.target.value)}
+              onChange={(e) => handleTextTASK(e.target.value)}
+              value={textTASK}
+              sx={{ marginTop: 2 }}
             />
+            <Button variant="contained" onClick={handleSearchBySketchandText} sx={{ marginTop: 2 }}>
+              Search
+            </Button>
+          </Card>
+          {/* Small Canvas below Search by Sequence */}
 
-            <p style={{ margin: 0, marginLeft: 10 }}>Translate</p>
-            <Checkbox
-              {...label}
-              style={{ padding: 0, borderRadius: 6 }}
-              checked={form2.translate}
-              onChange={() => onChangeForm2("translate", !form2.translate)}
-            />
-          </div>
-        </Card>
-{/* 
-        <Card
-          variant="outlined"
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            padding: 1,
-            gap: 1.5,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              alignItems: "center",
-            }}
-          >
-            <p style={{ margin: 0 }}>Search OCR</p>
-            <Checkbox
-              {...label}
-              style={{ padding: 0, borderRadius: 6 }}
-              checked={form3.ocr_search}
-              onChange={() => onChangeForm3("ocr_search", !form3.ocr_search)}
-            />
-          </div>
-
-          <TextField
-            label="OCR Text"
-            variant="outlined"
-            size="small"
-            value={form3.ocr_query}
-            onChange={(e) => onChangeForm3("ocr_query", e.target.value)}
-          />
-
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              alignItems: "center",
-            }}
-          >
-            <TextField
-              label="OCR filter number"
-              variant="outlined"
-              size="small"
-              sx={{ maxWidth: "180px" }}
-              value={form3.ocr_k}
-              onChange={(e) => onChangeForm3("ocr_k", e.target.value)}
-            />
-          </div>
-        </Card> */}
-
-
-        <Button
-          variant="contained"
-          sx={{ height: 40, width: "100%" }}
-          onClick={handleClick}
-        >
-          Search
-        </Button>
-
-        <Card
-          variant="outlined"
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            padding: 1,
-            gap: 1.5,
-          }}
-        >
-          <h4>Search by Image</h4>
-          <input type="file" accept="image/*" onChange={handleFileChange} />
-          <Button onClick={handleSearchByImage} variant="contained">Search by Image</Button>
-        </Card>
-        <Card variant="outlined" sx={{ padding: 1, gap: 1.5, display: "flex", flexDirection: "column" }}>
-          <h4>Search by Sequence</h4>
-          {textQueries.map((query, index) => (
-            <Box key={index} sx={{ display: 'flex', gap: 1 }}>
-              <TextField
-                label={`Query ${index + 1}`}
-                variant="outlined"
-                size="small"
-                value={query}
-                onChange={(e) => handleQueryChange(index, e.target.value)}
-                fullWidth
-              />
-              <Button variant="outlined" color="error" onClick={() => handleRemoveQuery(index)}>Remove</Button>
-            </Box>
-          ))}
-          <Button variant="contained" onClick={handleAddQuery}>+</Button>
-          <Button variant="contained" onClick={handleSearchBySequence} sx={{ marginTop: 2 }}>
-            Search
-          </Button>
-        </Card>
-
-        <Box sx={{ display: 'flex', gap: 2 }}>
-        <TextField
-          label="Q&A Answer"
-          variant="outlined"
-          size="small"
-          value={textData}
-          onChange={(e) => setTextData(e.target.value)}
-          sx={{ flex: 8 }}
-        />
-        <TextField
-          label="No"
-          variant="outlined"
-          size="small"
-          value={questionData}
-          onChange={(e) => setQuestionData(e.target.value)}
-          sx={{ flex: 2 }}
-        />
         </Box>
 
-        <Button
-          variant="contained"
-          color="secondary"
-          sx={{ height: 40, width: "100%" }}
-          onClick={handleExport}
-        >
-          Export
-        </Button>
-      </div>
+        {/* Middle section with Search Text and Search by Image stacked vertically */}
+        <Box sx={{  width: "250px", flexGrow: 1, display: "flex", flexDirection: "column", gap: 3 }}>
+          
+          {/* Search by Text at the top */}
+          <Card
+            variant="outlined"
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              padding: 1,
+              gap: 1.5,
+            }}
+          >
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <p style={{ margin: 0 }}>Search text</p>
+            </div>
 
-      
+            <TextField
+              label="Text"
+              variant="outlined"
+              size="small"
+              value={form2.prompt_query}
+              onChange={(e) => onChangeForm2("prompt_query", e.target.value)}
+            />
 
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <TextField
+                label="Text filter number"
+                variant="outlined"
+                size="small"
+                sx={{ maxWidth: "180px" }}
+                value={form2.prompt_k}
+                onChange={(e) => onChangeForm2("prompt_k", e.target.value)}
+              />
+              <p style={{ margin: 0, marginLeft: 10 }}>Translate</p>
+              <Checkbox
+                {...label}
+                style={{ padding: 0, borderRadius: 6 }}
+                checked={form2.translate}
+                onChange={() => onChangeForm2("translate", !form2.translate)}
+              />
+            </div>
+            <Button
+              variant="contained"
+              sx={{ height: 40, width: "100%" }}
+              onClick={handleClick}
+            >
+              Search
+            </Button>
+          </Card>
+
+          {/* Search by Image below Search Text */}
+          <Card
+            variant="outlined"
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              padding: 1,
+              gap: 1.5,
+            }}
+          >
+            <h4>Search by Image</h4>
+            <input type="file" accept="image/*" onChange={handleFileChange} />
+            <Button onClick={handleSearchByImage} variant="contained">Search by Image</Button>
+          </Card>
+          <Card
+            variant="outlined"
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              padding: 1,
+              gap: 1.5,
+            }}
+          >
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <TextField
+                label="Q&A Answer"
+                variant="outlined"
+                size="small"
+                value={textData}
+                onChange={(e) => setTextData(e.target.value)}
+                sx={{ flex: 8 }}
+              />
+              <TextField
+                label="No"
+                variant="outlined"
+                size="small"
+                value={questionData}
+                onChange={(e) => setQuestionData(e.target.value)}
+                sx={{ flex: 2 }}
+              />
+            </Box>
+
+            <Button
+              variant="contained"
+              color="secondary"
+              sx={{ height: 40, width: "100%", marginTop: 3 }}
+              onClick={handleExport}
+            >
+              Export
+            </Button>
+          </Card>
+        </Box>
+      </Box>
       <div style={{ flex: 1 }}>
         <div
           style={{
@@ -547,7 +603,7 @@ export default function App() {
           variant="outlined"
           sx={{
             display: "grid",
-            gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr",
+            gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr",
             padding: 1,
             gap: 2.5,
             flexWrap: "wrap",
@@ -567,6 +623,51 @@ export default function App() {
         </Card>
       </div>
     </Container>
+    {isCanvasOpen && (
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '2000px',
+          height: '1000px',
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+        }}
+        onClick={closeCanvas}
+      >
+        <div
+          style={{
+            position: 'relative',
+            width: '1500',
+            height: '1000px',
+            backgroundColor: '#fff',
+            padding: '10px 100px 10px',
+            borderRadius: 8,
+            boxShadow: '0px 4px 15px rgba(0,0,0,0.2)',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onClick={(e) => e.stopPropagation()} 
+        >
+          <h3>Canvas View</h3>
+          <canvas
+            ref={largeCanvasRef}
+            width={1280}
+            height={720}
+            style={{ border: '2px solid black' }}
+            onMouseDown={handleMouseDown}
+            onMouseUp={handleMouseUp}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+          />
+        </div>
+      </div>
+    )}
+    </>
   );
   // Function to get handle optional list of text query
 
