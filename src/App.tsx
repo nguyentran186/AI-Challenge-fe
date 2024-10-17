@@ -237,9 +237,6 @@ export default function App() {
     }
   };
 
-  const toggleEraser = () => {
-    setIsErasing(!isErasing);
-  };
   
   const updateSmallCanvas = () => {
     const largeCanvas = largeCanvasRef.current;
@@ -367,27 +364,6 @@ export default function App() {
       });
   }, []);
 
-  const handleInputChange = (event: React.ChangeEvent<{}>, newInputValue: string) => {
-    setInputValue(newInputValue);
-  };
-
-  const handleChange = (event: React.ChangeEvent<{}>, newValue: Tag | null) => {
-    if (newValue) {
-      setSelectedTags(prevTags => [...prevTags, newValue.label]);
-      setForm1(prevForm1 => ({
-        ...prevForm1,
-        tag_query: prevForm1.tag_query ? `${prevForm1.tag_query} ${newValue.label}` : newValue.label
-      }));
-      setInputValue(''); // Reset the input value
-    } else {
-      setInputValue('');
-    }
-  };
-
-  const handleClearSelectedTags = () => {
-    setSelectedTags([]); // Clear the all selected tags list
-    setForm1(prevForm1 => ({ ...prevForm1, tag_query: '' })); // Clear tag_query in form1
-  };
 
   const [selectResult, setSelectResult] = React.useState<string[]>([]);
   const [checkedItems, setCheckedItems] = React.useState<Record<string, boolean>>({});
