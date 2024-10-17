@@ -16,6 +16,87 @@ function getFirstNElements(arr: string[], n: number = N) {
 }
 
 export default function App() {
+  const [token, setToken] = useState<string | null>(null);
+  const [id, setID] = useState<string | null>(null);
+  const [idqa, setIDQA] = useState<string | null>(null);
+  const [msData, setMsData] = useState(null);
+  const [milliseconds, setMilliseconds] = useState(null); // State to hold the ms value
+
+  useEffect(() => {
+    const fetchToken = async () => {
+      const formData = {
+        username: "team20",
+        password: "WRyLDJ2wZG"
+      };
+
+      try {
+        const response = await fetch('https://eventretrieval.one/api/v2/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',  // Make sure the server knows you're sending JSON
+          },
+          body: JSON.stringify(formData), // Convert the formData object to a JSON string
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        setToken(data.sessionId); // Assuming the token is returned in the 'sessionId' field
+        console.log('Token fetched:', data.sessionId);
+
+        // Call fetchID only after the token is successfully fetched
+        fetchID(data.sessionId); 
+
+      } catch (error) {
+        console.error("Error fetching token:", error);
+      }
+    };
+
+    const fetchID = async (sessionId: string) => {
+      try {
+        const response = await fetch(`https://eventretrieval.one/api/v2/client/evaluation/list?session=${sessionId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        setID(data[0].id); // Assuming the 'id' field is returned
+        setIDQA(data[1].id); // Assuming the 'id' field is returned
+        console.log('Data fetched:', data);
+
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    };
+
+    fetchToken(); // Trigger fetching token and fetching ID after token is available
+  }, []); // The empty array ensures the effect runs only once
+
+  useEffect(() => {
+    // Load ms.json from the public folder
+    const loadMsData = async () => {
+      try {
+        const response = await fetch('/ms.json');
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        const data = await response.json();
+        setMsData(data);
+      } catch (error) {
+        console.error('Error loading ms.json:', error);
+      }
+    };
+    loadMsData();
+  }, []);
+
   const [form1, setForm1] = React.useState({
     tag_search: false,
     tag_query: '',
@@ -389,26 +470,90 @@ export default function App() {
       questionData,
     };
 
+    // Split the first image name
+    var split = exportData.images[0].split("_");
+    const batch = split[0]; // e.g., 'L01'
+    const video = split[1]; // e.g., 'V001'
+    const frame = split[2]; // e.g., '0'
+
+    // Check if msData is not null or undefined
+    if (!msData) {
+      console.error("msData is null or undefined.");
+      return; // Exit the function early
+    }
+
     try {
-      const response = await fetch("http://localhost:8080/export", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(exportData),
-      });
+      // Check if the constructed key exists in msData
+      const ms = msData[`${batch}_${video}`][`${frame}`];
+      if (ms !== undefined) {
+        setMilliseconds(ms); // Assuming you want to store it in state
+        
+        // Prepare formData based on submission type
+        let formData;
+        const submissionURL = textData === "" 
+          ? `https://eventretrieval.one/api/v2/submit/${id}?session=${token}`
+          : `https://eventretrieval.one/api/v2/submit/${idqa}?session=${token}`;
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        if (textData === "") {
+          console.log("KIS submission");
+          formData = {
+            "answerSets": [
+              {
+                "answers": [
+                  {
+                    "mediaItemName": `${batch}_${video}`,
+                    "start": ms,
+                    "end": ms,
+                  }
+                ]
+              }
+            ]
+          };
+        } else {
+          console.log("QA submission");
+          formData = {
+            "answerSets": [
+              {
+                "answers": [
+                  {
+                    "text": `${textData}-${batch}_${video}-${ms}`
+                  }
+                ]
+              }
+            ]
+          };
+        }
+
+        console.log('Submitting formData:', JSON.stringify(formData, null, 2)); // Print formData
+
+        try {
+          const response = await fetch(submissionURL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(formData),
+          });
+
+          if (!response.ok) {
+            const errorResponse = await response.json(); // Try to get error details from the server
+            throw new Error(`HTTP error! status: ${response.status}, message: ${JSON.stringify(errorResponse)}`);
+          }
+
+          const data = await response.json();
+          console.log('Data fetched:', data);
+
+        } catch (error) {
+          console.error("Error fetching data:", error);
+        }
+      } else {
+        console.error('Milliseconds data not found for the specified keys.');
+        setMilliseconds(null); // Reset to null if not found
       }
-
-      const data = await response.json();
-      console.log("Export successful:", data);
-
     } catch (error) {
       console.error("Error:", error);
     }
-  };
+};
 
   return (
     <>
