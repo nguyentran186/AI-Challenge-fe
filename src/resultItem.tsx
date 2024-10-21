@@ -6,16 +6,17 @@ export default function ResultItem({
   checked,
   setRemoveResult,
   setCheckedItems,
+  onClick, // Add onClick prop here
 }: {
   name: string;
   checked: boolean;
   setRemoveResult: React.Dispatch<React.SetStateAction<string[]>>;
-  setCheckedItems: React.Dispatch<
-    React.SetStateAction<Record<string, boolean>>
-  >;
+  setCheckedItems: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  onClick?: () => void; // Define the type for onClick
 }) {
   const nameList = name.split("_");
   const path = `/data/keyframes_trans/${nameList[0]}/${nameList[1]}/${nameList[2]}.jpg`;
+
   React.useEffect(() => {
     if (checked) {
       setRemoveResult((prev) => {
@@ -34,15 +35,8 @@ export default function ResultItem({
   }, [checked]);
 
   return (
-    <a href={path} target="_blank">
-      <div
-        style={{
-          width: "fit-content",
-          display: "flex",
-          flexDirection: "column",
-          gap: 6,
-        }}
-      >
+    <div onClick={onClick} style={{ cursor: "pointer" }}> {/* Set onClick handler */}
+      <div style={{ width: "fit-content", display: "flex", flexDirection: "column", gap: 6 }}>
         <div style={{ position: "relative", width: 132, height: 80 }}>
           <img
             src={path}
@@ -64,13 +58,14 @@ export default function ResultItem({
               borderRadius: 6,
             }}
             checked={checked}
-            onClick={() =>
-              setCheckedItems((prev) => ({ ...prev, [name]: !checked }))
-            }
+            onClick={(e) => {
+              e.stopPropagation(); // Prevent triggering onClick of parent div
+              setCheckedItems((prev) => ({ ...prev, [name]: !checked }));
+            }}
           />
         </div>
         <p style={{ margin: 0, textAlign: "center", fontSize: 13 }}>{name}</p>
       </div>
-    </a>
+    </div>
   );
 }

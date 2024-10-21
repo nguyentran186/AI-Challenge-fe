@@ -9,7 +9,7 @@ interface Tag {
 
 const label = { inputProps: { "aria-label": "Checkbox demo" } };
 
-const N = 100;
+const N = 1000;
 
 function getFirstNElements(arr: string[], n: number = N) {
   return arr.slice(0, n);
@@ -71,7 +71,7 @@ export default function App() {
         setID(data[0].id); // Assuming the 'id' field is returned
         setIDQA(data[0].id); // Assuming the 'id' field is returned
         console.log('Data fetched:', data);
-
+        console.log(data[1].id)
       } catch (error) {
         console.error("Error fetching data:", error);
       }
@@ -134,6 +134,31 @@ export default function App() {
   const [questionData, setQuestionData] = useState<string>(''); //
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [textQueries, setTextQueries] = useState<string[]>([""]);
+  const [selectedSketch, setSelectedSketch] = useState<File | null>(null);
+
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
+
+  const handleImageClick = (imageName: string) => {
+    const frameParts = imageName.split('_'); // Split the name to get the frame ID
+    const frameId = parseInt(frameParts[2], 10); // Extract the frame number (e.g., 123)
+
+    // Define the range of frames to display
+    const startFrame = frameId - 5; // 5 frames before
+    const endFrame = frameId + 5; // 5 frames after
+
+    const batch = frameParts[0]; // e.g., 'L08'
+    const video = frameParts[1]; // e.g., 'V023'
+
+    // Create an array to hold the names of the frames to display
+    const imagesToShow = [];
+    for (let i = startFrame; i <= endFrame; i++) {
+        // Format the frame number with leading zeros (assuming 3 digits)
+        const formattedFrame = String(i).padStart(3, '0');
+        imagesToShow.push(`${batch}/${video}/${formattedFrame}`); // Construct the frame name
+    }
+
+    setSelectedImages(imagesToShow); // Update the state to show selected images
+  };
 
   const setCanvasBackground = (canvas: HTMLCanvasElement, color: string) => {
     const ctx = canvas.getContext('2d');
@@ -329,6 +354,26 @@ export default function App() {
         setSelectedFile(event.target.files[0]);
     }
     };
+  
+  const handleSketchFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      setSelectedSketch(file);
+  
+      // Create a FileReader to convert the file to a base64 string
+      const reader = new FileReader();
+      reader.onload = () => {
+        // The result is a base64 string
+        const base64String = reader.result as string;
+        
+        // Assign the base64 string to sketchTask
+        setSketchTASK(getBase64StringFromDataURL(base64String));
+      };
+  
+      // Read the file as a Data URL (base64 string)
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSearchByImage = async () => {
     if (!selectedFile) {
@@ -460,7 +505,7 @@ export default function App() {
 
     try {
       // Check if the constructed key exists in msData
-      const ms = msData[`${batch}_${video}`][`${frame}`];
+      const ms = msData[`${batch}_${video}`][`${parseInt(frame)}`];
       if (ms !== undefined) {
         setMilliseconds(ms); // Assuming you want to store it in state
         
@@ -578,6 +623,8 @@ export default function App() {
               value={textTASK}
               sx={{ marginTop: 2 }}
             />
+            <input type="file" accept="image/*" onChange={handleSketchFileChange} />
+
             <Button variant="contained" onClick={handleSearchBySketchandText} sx={{ marginTop: 2 }}>
               Search
             </Button>
@@ -739,6 +786,7 @@ export default function App() {
               checked={!!checkedItems[name]}
               setRemoveResult={setSelectResult}
               setCheckedItems={setCheckedItems}
+              onClick={() => handleImageClick(name)}
             />
           ))}
         </Card>
@@ -787,6 +835,30 @@ export default function App() {
           />
         </div>
       </div>
+    )}
+    {selectedImages.length > 0 && (
+      <Card variant="outlined" sx={{ marginTop: 2 }}>
+        <h4>Selected Images</h4>
+        <Card
+          variant="outlined"
+          sx={{
+            display: "grid",
+            gridTemplateColumns: "repeat(6, 1fr)", // Adjust based on your layout
+            padding: 1,
+            gap: 2.5,
+          }}
+        >
+          {selectedImages.map((imgName) => (
+            <img
+              src={`data/keyframes_trans/${imgName}.jpg`} // Update this with your actual image path
+              alt={imgName}
+              key={imgName}
+              style={{ width: '100%', height: 'auto' }} // Style as needed
+              title={imgName}
+            />
+          ))}
+        </Card>
+      </Card>
     )}
     </>
   );
